@@ -876,15 +876,18 @@ export function SettingsView({ token, onSettingsUpdated }: SettingsViewProps) {
 
                 <div>
                   <label className="block text-[11px] font-medium text-slate-700 mb-1">
-                    Chave de API do Gemini ({hasKeys.gemini ? 'Configurada no Servidor ✓' : 'Não configurada'})
+                    Chaves de API do Gemini ({hasKeys.gemini ? 'Configurada no Servidor ✓' : 'Não configurada'})
                   </label>
                   <input
                     type="password"
                     value={form.geminiApiKey}
                     onChange={(e) => setForm({ ...form, geminiApiKey: e.target.value })}
                     className="w-full text-xs font-mono px-3 py-2 border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-indigo-500"
-                    placeholder={hasKeys.gemini ? '•••••••••••••••••••••••• (deixe vazio para manter a salva)' : 'AIzaSy...'}
+                    placeholder={hasKeys.gemini ? '•••••••••••••••••••••••• (deixe vazio para manter a salva)' : 'Cole uma ou mais chaves separadas por vírgula (AIzaSy..., AIzaSy...)'}
                   />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Pool de Chaves com Failover: Aceita várias chaves separadas por vírgula. Se uma chave atingir limite de cota ou sobrecarga temporária (503/429), o sistema alterna automaticamente para a próxima chave.
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -897,10 +900,10 @@ export function SettingsView({ token, onSettingsUpdated }: SettingsViewProps) {
                       value={form.geminiModel}
                       onChange={(e) => setForm({ ...form, geminiModel: e.target.value })}
                       className="w-full text-xs font-mono px-3 py-2 border border-slate-300 rounded-md bg-white"
-                      placeholder="gemini-2.5-flash"
+                      placeholder="gemini-3.8-flash"
                     />
                     <div className="flex flex-wrap gap-1 mt-1.5">
-                      {['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-1.5-pro'].map((m) => (
+                      {['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'].map((m) => (
                         <button
                           key={m}
                           type="button"

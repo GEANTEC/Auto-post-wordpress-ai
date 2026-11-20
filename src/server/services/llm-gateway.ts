@@ -131,50 +131,87 @@ export async function executeLlmPrompt(params: {
   }
 
   // ==========================================================================
-  // 2. GOOGLE GEMINI (@google/genai)
+  // 2. GOOGLE GEMINI (@google/genai) — Com Pool de Chaves e Retry Automático
   // ==========================================================================
   if (provider === 'gemini') {
-    const apiKey = params.apiKey || settings.geminiApiKey || env.GEMINI_API_KEY;
-    const modelName = params.model || settings.geminiModel || env.GEMINI_DEFAULT_MODEL || 'gemini-2.5-flash';
-    const hasValidKey = Boolean(apiKey) && apiKey !== 'MY_GEMINI_API_KEY';
+    const rawKeyInput = params.apiKey || settings.geminiApiKey || env.GEMINI_API_KEY || '';
+    const keys = rawKeyInput
+      .split(/[\n,;]+/)
+      .map((k: string) => k.trim())
+      .filter((k: string) => k && k !== 'MY_GEMINI_API_KEY');
 
-    if (hasValidKey) {
-      try {
-        const ai = new GoogleGenAI({
-          apiKey,
-          httpOptions: {
-            headers: {
-              'User-Agent': 'aistudio-build',
-            },
-          },
-        });
+    let modelName = params.model || settings.geminiModel || env.GEMINI_DEFAULT_MODEL || 'gemini-3.8-flash';
+    if (modelName === 'gemini-2.5-flash' || modelName === 'gemini-1.5-flash') {
+      modelName = 'gemini-3.8-flash';
+    }
 
-        const response = await ai.models.generateContent({
-          model: modelName,
-          contents: cleanPrompt,
-          config: {
-            temperature,
-            systemInstruction: params.systemInstruction || undefined,
-          },
-        });
+    if (keys.length > 0) {
+      let lastErrorMessage = '';
 
-        return {
-          provider: 'gemini',
-          model: modelName,
-          output: response.text || 'No text returned from Gemini model.',
-          latencyMs: Date.now() - start,
-          liveApiUsed: true,
-        };
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        return {
-          provider: 'gemini',
-          model: modelName,
-          output: `[Gemini Error (${message.slice(0, 120)})]: Falha ao comunicar com a API do Google Gemini.`,
-          latencyMs: Date.now() - start,
-          liveApiUsed: false,
-        };
+      // Rotação sobre o pool de chaves disponíveis
+      for (let kIdx = 0; kIdx < keys.length; kIdx++) {
+        const apiKey = keys[kIdx];
+
+        // Até 2 tentativas por chave com backoff em caso de alta demanda (503) ou rate limit (429)
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const ai = new GoogleGenAI({
+              apiKey,
+              httpOptions: {
+                headers: {
+                  'User-Agent': 'aistudio-build',
+                },
+              },
+            });
+
+            const response = await ai.models.generateContent({
+              model: modelName,
+              contents: cleanPrompt,
+              config: {
+                temperature,
+                systemInstruction: params.systemInstruction || undefined,
+              },
+            });
+
+            const text = response.text || '';
+            if (text && text.trim()) {
+              return {
+                provider: 'gemini',
+                model: modelName,
+                output: text,
+                latencyMs: Date.now() - start,
+                liveApiUsed: true,
+              };
+            }
+          } catch (err: unknown) {
+            lastErrorMessage = err instanceof Error ? err.message : String(err);
+            console.warn(
+              `[Gemini Pool] Chave ${kIdx + 1}/${keys.length} (Tentativa ${attempt}/2) retornou erro: ${lastErrorMessage.slice(0, 100)}`
+            );
+
+            const isTransient =
+              lastErrorMessage.includes('503') ||
+              lastErrorMessage.includes('429') ||
+              lastErrorMessage.includes('high demand') ||
+              lastErrorMessage.includes('overloaded');
+
+            if (isTransient && attempt < 2) {
+              await new Promise((res) => setTimeout(res, 2000 * attempt));
+            } else {
+              // Se não for transitório ou já esgotou as tentativas desta chave, passa para a próxima chave do pool
+              break;
+            }
+          }
+        }
       }
+
+      return {
+        provider: 'gemini',
+        model: modelName,
+        output: `[Gemini Error (${lastErrorMessage.slice(0, 120)})]: Falha ao comunicar com a API do Google Gemini.`,
+        latencyMs: Date.now() - start,
+        liveApiUsed: false,
+      };
     }
 
     return {

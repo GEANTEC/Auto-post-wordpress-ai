@@ -533,6 +533,11 @@ Por favor, reescreva em português com padrão editorial profissional e otimizad
       systemInstruction: systemPrompt,
     });
 
+    // Escudo Anti-Erro: Garante que falhas de API nunca sejam publicadas como matérias
+    if (!aiResult.liveApiUsed || aiResult.output.includes('[Gemini Error') || aiResult.output.includes('Falha ao comunicar com a API')) {
+      throw new Error(`Falha na IA (${provider}): ${aiResult.output}`);
+    }
+
     const parsed = parseRobustArticleJson(aiResult.output, article);
 
     const articleUpdates: Partial<CapturedArticle> = {

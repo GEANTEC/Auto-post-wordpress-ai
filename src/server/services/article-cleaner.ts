@@ -209,7 +209,7 @@ export function parseRobustArticleJson(
   } else {
     // Fallback limpo: se não conseguiu extrair content por regex, sanitiza o candidate
     content = sanitizeArticleHtmlForPublish(candidate);
-    if (!content || content.includes('"excerpt":') || content.length < 50) {
+    if (!content || content.includes('"excerpt":') || content.includes('[Gemini Error') || content.includes('Falha ao comunicar com a API') || content.length < 50) {
       content = sanitizeArticleHtmlForPublish(defaultContent);
     }
   }

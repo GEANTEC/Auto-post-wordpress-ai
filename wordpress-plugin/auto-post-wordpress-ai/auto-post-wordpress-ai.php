@@ -765,9 +765,14 @@ class AutoPostWordPressAI {
                 if ($term) {
                     $cat_ids[] = (int) (is_array($term) ? $term['term_id'] : $term);
                 } else {
-                    $created = wp_create_category($cname);
-                    if ($created && !is_wp_error($created)) {
-                        $cat_ids[] = (int) $created;
+                    $created = wp_insert_term($cname, 'category');
+                    if (!is_wp_error($created) && isset($created['term_id'])) {
+                        $cat_ids[] = (int) $created['term_id'];
+                    } elseif (function_exists('wp_create_category')) {
+                        $cat_id = wp_create_category($cname);
+                        if ($cat_id && !is_wp_error($cat_id)) {
+                            $cat_ids[] = (int) $cat_id;
+                        }
                     }
                 }
             }
